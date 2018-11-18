@@ -134,8 +134,8 @@ def flow_runner():
         #get all derivatives
 
         #unfortunately convolve2d doesn't broacast in 3D
-        frames_Ix = np.zeros((numFrames, H, W))
-        frames_Iy = np.zeros((numFrames, H, W))
+        frames_Ix = np.zeros((numFrames-1, H, W))
+        frames_Iy = np.zeros((numFrames-1, H, W))
 
         for i in range(numFrames):
             __, frames_Ix[i], frames_Iy[i], __ = findDerivatives(frames_gray[i])
@@ -155,20 +155,62 @@ def flow_runner():
         #do actual calc across all frames
         uv = np.zeros( (numFrames-1, maxFeatures, 2))
 
-        #windows is a maxFeatures x 1 array
+        #calculate the sum of derivatives in the windows around each feature point
         summation_kernel = np.ones( (windowsize,windowsize) )
-        frames_summed_Ix = np.zeros_like(frames_gray)
-        frames_summed_Iy = np.zeros_like(frames_gray)
-        frames_summed_Ix_squared = np.zeros_like(frames_gray)
-        frames_summed_Iy_squared = np.zeros_like(frames_gray)
-        frames_summed_Ix_Iy = np.zeros_like(frames_gray)
-        for i in range(numFrames):
+        frames_summed_Ix = np.zeros_like(frames_Ix)
+        frames_summed_Iy = np.zeros_like(frames_Ix)
+        frames_summed_It = np.zeros_like(frames_Ix)
+        frames_summed_Ix_squared = np.zeros_like(frames_Ix)
+        frames_summed_Iy_squared = np.zeros_like(frames_Ix)
+        frames_summed_Ix_Iy = np.zeros_like(frames_Ix)
+        frames_summed_Ix_It = np.zeros_like(frames_Ix)
+        frames_summed_Iy_It = np.zeros_like(frames_Ix)
+        for i in range(numFrames-1):
             frames_summed_Ix[i] = signal.convolve2d(frames_Ix, summation_kernel, mode='same', boundary='symm')
             frames_summed_Iy[i] = signal.convolve2d(frames_Iy, summation_kernel, mode='same', boundary='symm')
+            frames_summed_It[i] = signal.convolve2d(frames_It, summation_kernel, mode='same', boundary='symm')
         frames_summed_Ix_squared = frames_summed_Ix * frames_summed_Ix
         frames_summed_Iy_squared = frames_summed_Iy * frames_summed_Iy
         frames_summed_Ix_Iy = frames_summed_Ix * frames_summed_Iy
+        frames_summed_Ix_It = frames_summed_Ix * frames_summed_Iy
+        frames_summed_Iy_It = frames_summed_Ix * frames_summed_Iy
 
+        #create the A matrix and b vector at each feature point
+        '''
+        for each feature point in each frame 
+        A * uv = -b
+        [[
+            sum(Ix*Ix)      sum(Ix)*sum(Iy)
+            sum(Ix)*sum(Iy)      sum(Iy*Iy)
+        ]]
+
+        *
+        [[
+            u
+            v
+        ]]
+
+        =
+
+        -[[
+            sum(Ix*It)
+            sum(Iy*It)
+        ]]
+        '''
+        #A is size (numFrames-1)xmaxFeaturesx2x2
+        A = 
+
+        #B is size (numFrames-1)xmaxFeaturesx2x1
+
+        #uv is size (numFrames-1)xmaxFeaturesx2x1
+
+        uv.reshape( (numFrames-1, maxFeatures, 2) )
+
+        '''
+        output of calc: (numFrames-1)xmaxFeaturesx2
+        xdisplacement
+        ydisplacement
+        '''
 
         #at the end of the actual calc,
         # we should have a (numFrames-1)xmaxFeaturesx2 vector with u v values for each feature in each frame
