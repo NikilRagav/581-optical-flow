@@ -18,8 +18,6 @@ from loadVideo import loadVideo
 def rgb2gray(rgb):
   return np.dot(rgb[...,:3], [0.299, 0.587, 0.114])
 
-
-
 def flow_runner():
     '''
     It probably makes sense to do this 10 frames at a time.
@@ -91,15 +89,25 @@ def flow_runner():
 
     #filepaths for input and output
 
-    #load video 
+
 
     #number of frames to calculate at a time
     numFrames = 10
     currentFrame = 0
 
-    current_frames, totalFrames = loadVideo(input, numFrames)
-    #H, W, color channels come from the video file itself
-    H,W = current_frames.shape[1], current_frames.shape[2]
+    #open output video file
+
+    current_frames, totalFrames = loadVideo(input, currentFrame, numFrames)
+    #H, W come from the video file itself
+    numFrames, H,W = current_frames.shape[0], current_frames.shape[1], current_frames.shape[2]
+
+    #let user draw bounding box on frame[0]
+    # for now we'll just do the tracking on the whole frame
+
+    #constants for corner detection
+    maxCorners = 50
+    qualityLevel = .05
+    minDistance = np.min(H,W)/windowsize
 
     while (currentFrame + numFrames - 1) < totalFrames:
         #get grayscale
@@ -116,6 +124,40 @@ def flow_runner():
 
         frames_It = current_frames[1:] - current_frames[0:-1]
 
-        
+        #get features
+        #goddamnit please vectorize APIs!!
+        '''
+        corner_list = np.empty( (numFrames), dtype='object')
+        for i in range(numFrames):
+            corner_list[i] = feature.corner_peaks( feature.corner_shi_tomasi(frames_gray[i]) )
+        '''
+        corner_list = np.zeros( (numFrames, maxCorners, 2) )
+        for i in range(numFrames):
+            corner_list[i] = cv2.goodFeaturesToTrack(frames_gray[i], maxCorners, qualityLevel, minDistance)
+
+        #remove points that are outside the bounding box for this frame
+        # for now, we'll just do the whole frame
+
+        #do actual calc
+
+        #at the end of the actual calc,
+        # we should have a numFramesxnumFeaturesx2 vector with u v values for each feature in each frame
+
+        #get the vectors to draw
+        #throw out the vectors for image points that were originally not in the image
+        # if for a particular frame we ended up with fewer than our maximum number of features
+
+        #calculating new bounding box
+        #take the old features that were within the bounding box
+        #apply the u,v transformation for them
+        #do ransac on them to estimate a similarity transform for the bounding box
+        #do a similarity transform on the old box coords
+        #draw new box at transformed coords
+
+        #append to output video
+
+        currentFrame += numFrames
+        current_frames, __ = loadVideo(input, currentFrame+numFrames, numFrames)
+        numFrames = current_frames.shape[0]
     
     return 0
