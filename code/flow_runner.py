@@ -15,6 +15,7 @@ import imageio
 
 from findDerivatives import findDerivatives
 from loadVideo import loadVideo
+from getFeatures import getFeatures
 
 def rgb2gray(rgb):
   return np.dot(rgb[...,:3], [0.299, 0.587, 0.114])
@@ -116,43 +117,61 @@ def flow_runner():
     # for now we'll just do the tracking on the whole frame
 
     #constants for corner detection
-    maxCorners = 50
+    maxFeatures = 50
     qualityLevel = .05
-    minDistance = np.min(H,W)/windowsize
+    minDistance = (8/360)*H #keep same ratio of 8 pixel distance for a 360p video regardless of resolution
+
+    windowsize = 9
+    half_window = np.floor(windowsize/2)
 
     while (currentFrame + numFrames - 1) < totalFrames:
         #get grayscale
         frames_gray = bgr2gray(current_frames)
 
+        # #pad all frames by floor(windowsize/2) along all sides
+        # frames_gray_padded = np.pad(frames_gray, ( (half_window,half_window), (half_window,half_window) ), mode='reflect')
+
         #get all derivatives
 
         #unfortunately convolve2d doesn't broacast in 3D
-        frames_Ix = np.zeros((numFrames, H, W, 3))
-        frames_Iy = np.zeros((numFrames, H, W, 3))
+        frames_Ix = np.zeros((numFrames, H, W))
+        frames_Iy = np.zeros((numFrames, H, W))
 
         for i in range(numFrames):
             __, frames_Ix[i], frames_Iy[i], __ = findDerivatives(frames_gray[i])
 
-        frames_It = current_frames[1:] - current_frames[0:-1]
+        frames_It = frames_gray[1:] - frames_gray[0:-1]
 
         #get features
         #goddamnit please vectorize APIs!!
-        '''
-        corner_list = np.empty( (numFrames), dtype='object')
+        feature_list = np.zeros( (numFrames, maxFeatures, 2) )
         for i in range(numFrames):
-            corner_list[i] = feature.corner_peaks( feature.corner_shi_tomasi(frames_gray[i]) )
-        '''
-        corner_list = np.zeros( (numFrames, maxCorners, 2) )
-        for i in range(numFrames):
-            corner_list[i] = cv2.goodFeaturesToTrack(frames_gray[i], maxCorners, qualityLevel, minDistance)
-
-        #remove points that are outside the bounding box for this frame
+            __, __, feature_list[i] = getFeatures(frames_gray[i], (0,0,W,H), maxFeatures, qualityLevel, minDistance)
         # for now, we'll just do the whole frame
+        zaxis = np.rollaxis( np.rollaxis( np.outer(np.ones((1,maxFeatures,1)), np.arange(3) )[np.newaxis, :], 2, 0), 2, 1)
+        feature_list = np.concatenate( (zaxis, feature_list), axis=2)
+        #now it is z,x,y coordinates (where z is frame number)
 
-        #do actual calc
+        #do actual calc across all frames
+        uv = np.zeros( (numFrames-1, maxFeatures, 2))
+
+        #windows is a maxFeatures x 1 array
+        summation_kernel = np.ones( (windowsize,windowsize) )
+        frames_summed_Ix = np.zeros_like(frames_gray)
+        frames_summed_Iy = np.zeros_like(frames_gray)
+        frames_summed_Ix_squared = np.zeros_like(frames_gray)
+        frames_summed_Iy_squared = np.zeros_like(frames_gray)
+        frames_summed_Ix_Iy = np.zeros_like(frames_gray)
+        for i in range(numFrames):
+            frames_summed_Ix[i] = signal.convolve2d(frames_Ix, summation_kernel, mode='same', boundary='symm')
+            frames_summed_Iy[i] = signal.convolve2d(frames_Iy, summation_kernel, mode='same', boundary='symm')
+        frames_summed_Ix_squared = frames_summed_Ix * frames_summed_Ix
+        frames_summed_Iy_squared = frames_summed_Iy * frames_summed_Iy
+        frames_summed_Ix_Iy = frames_summed_Ix * frames_summed_Iy
+
 
         #at the end of the actual calc,
-        # we should have a numFramesxnumFeaturesx2 vector with u v values for each feature in each frame
+        # we should have a (numFrames-1)xmaxFeaturesx2 vector with u v values for each feature in each frame
 
         #get the vectors to draw
         #throw out the vectors for image points that were originally not in the image
@@ -166,6 +185,8 @@ def flow_runner():
         #draw new box at transformed coords
 
         #append to output video
+        for frame in current_frames:
+            out.write(frame)
 
         currentFrame += numFrames
         current_frames, __ = loadVideo(filename, currentFrame+numFrames, numFrames)
@@ -176,7 +197,6 @@ def flow_runner():
     #med fps = 30.01
     #hard fps = 30.33
     # imageio.mimsave(filename+"_output.mp4", output_frames, format="MP4", fps="29")
-    cap.release()
     out.release()
     cv2.destroyAllWindows()
 

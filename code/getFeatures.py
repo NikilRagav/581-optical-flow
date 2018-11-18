@@ -24,4 +24,4 @@ def getFeatures(img, bbox, maxCorners, qualityLevel, minDistance):
 			x = np.append(x, x_f, axis=1)
 			y = np.append(y, y_f, axis=1)
 
-		return x, y
+		return x, y, np.concatenate((y,x), axis=1)
