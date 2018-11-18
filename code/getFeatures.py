@@ -3,12 +3,12 @@ import numpy as np
 
 # returns NxF matrix with N row coordinates of the features across F objects
 # returns NxF matrix with N col coordinates of the features across F objects
-def getFeatures(img, bbox, maxCorners, imgSize, minDistance):
+def getFeatures(img, bbox, maxCorners, qualityLevel, minDistance):
 
 	first = True
 	for x0, y0, w, h in bbox:
 		window = img[y0:y0+h, x0:x0+w]
-		corners = (cv2.goodFeaturesToTrack(window, maxCorners, 0.01, imgSize, minDistance)).astype(int)
+		corners = (cv2.goodFeaturesToTrack(window, maxCorners, 0.01, qualityLevel, minDistance)).astype(int)
 
 		x_f = [corner[0][0]+x0 for corner in corners]
 		y_f = [corner[0][1]+y0 for corner in corners]
