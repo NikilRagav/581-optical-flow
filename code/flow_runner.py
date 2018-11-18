@@ -13,7 +13,7 @@ from PIL import Image
 import imageio
 
 from findDerivatives import findDerivatives
-
+from loadVideo import loadVideo
 
 def rgb2gray(rgb):
   return np.dot(rgb[...,:3], [0.299, 0.587, 0.114])
@@ -89,25 +89,33 @@ def flow_runner():
     even if objects leave the frame etc
     '''
 
+    #filepaths for input and output
+
     #load video 
 
     #number of frames to calculate at a time
     numFrames = 10
+    currentFrame = 0
 
+    current_frames, totalFrames = loadVideo(input, numFrames)
     #H, W, color channels come from the video file itself
-    H,W = 10,10
+    H,W = current_frames.shape[1], current_frames.shape[2]
 
-    current_frames = np.zeros((numFrames, H, W, 3))
+    while (currentFrame + numFrames - 1) < totalFrames:
+        #get grayscale
+        frames_gray = rgb2gray(current_frames)
 
-    frames_gray = rgb2gray(current_frames)
+        #get all derivatives
 
-    #unfortunately convolve2d doesn't broacast in 3D
-    frames_Ix = np.zeros((numFrames, H, W, 3))
-    frames_Iy = np.zeros((numFrames, H, W, 3))
+        #unfortunately convolve2d doesn't broacast in 3D
+        frames_Ix = np.zeros((numFrames, H, W, 3))
+        frames_Iy = np.zeros((numFrames, H, W, 3))
 
-    for i in range(numFrames):
-        __, frames_Ix[i], frames_Iy[i], __ = findDerivatives(frames_gray[i])
+        for i in range(numFrames):
+            __, frames_Ix[i], frames_Iy[i], __ = findDerivatives(frames_gray[i])
 
-    frames_It = current_frames[1:] - current_frames[0:-1]
+        frames_It = current_frames[1:] - current_frames[0:-1]
+
+        
     
     return 0
