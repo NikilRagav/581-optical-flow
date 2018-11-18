@@ -10,6 +10,7 @@ from scipy import sparse
 from scipy import interpolate
 from skimage import feature
 from PIL import Image
+import os
 import imageio
 
 from findDerivatives import findDerivatives
@@ -17,6 +18,9 @@ from loadVideo import loadVideo
 
 def rgb2gray(rgb):
   return np.dot(rgb[...,:3], [0.299, 0.587, 0.114])
+
+def bgr2gray(bgr):
+  return np.dot(bgr[...,:3], [0.114,0.587,0.299])
 
 def flow_runner():
     '''
@@ -88,18 +92,25 @@ def flow_runner():
     '''
 
     #filepaths for input and output
-    filename = "input_videos/Easy.mp4"
+    in_folder = "input_videos/"
+    out_folder = "input_videos/"
+    filename = "Easy.mp4"
 
+    in_video_path = os.path.join(in_folder,filename)
+    out_video_path = os.path.join(out_folder,filename)
 
     #number of frames to calculate at a time
     numFrames = 10
     currentFrame = 0
 
-    #open output video file
 
-    current_frames, totalFrames = loadVideo(filename, currentFrame, numFrames)
+    current_frames, totalFrames, fps = loadVideo(in_video_path, currentFrame, numFrames)
     #H, W come from the video file itself
     numFrames, H,W = current_frames.shape[0], current_frames.shape[1], current_frames.shape[2]
+
+    #open output video file
+    fourcc = cv2.VideoWriter_fourcc(*'MP4V')
+    out = cv2.VideoWriter(out_video_path, fourcc, fps, (W,H))
 
     #let user draw bounding box on frame[0]
     # for now we'll just do the tracking on the whole frame
@@ -111,7 +122,7 @@ def flow_runner():
 
     while (currentFrame + numFrames - 1) < totalFrames:
         #get grayscale
-        frames_gray = cv2.cvtColor(im, cv2.COLOR_BGR2GRAY)
+        frames_gray = bgr2gray(current_frames)
 
         #get all derivatives
 
@@ -164,6 +175,9 @@ def flow_runner():
     #easy fps = 29.97
     #med fps = 30.01
     #hard fps = 30.33
-    imageio.mimsave(filename+"_output.mp4", output_frames, format="MP4", fps="29")
-    
+    # imageio.mimsave(filename+"_output.mp4", output_frames, format="MP4", fps="29")
+    cap.release()
+    out.release()
+    cv2.destroyAllWindows()
+
     return 0
