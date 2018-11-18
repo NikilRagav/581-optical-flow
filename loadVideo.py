@@ -11,6 +11,8 @@ def loadVideo(filename, start):
 	start_frame = start
 	if start is not 0:
 		start_frame -= 1
+	if start is length - 1:
+		return np.array(frame_data), length
 	vid.set(cv2.CAP_PROP_POS_FRAMES, start_frame)
 
 	cnt = 0
