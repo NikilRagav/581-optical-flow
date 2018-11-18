@@ -88,7 +88,7 @@ def flow_runner():
     '''
 
     #filepaths for input and output
-
+    filename = "input_videos/Easy.mp4"
 
 
     #number of frames to calculate at a time
@@ -97,7 +97,7 @@ def flow_runner():
 
     #open output video file
 
-    current_frames, totalFrames = loadVideo(input, currentFrame, numFrames)
+    current_frames, totalFrames = loadVideo(filename, currentFrame, numFrames)
     #H, W come from the video file itself
     numFrames, H,W = current_frames.shape[0], current_frames.shape[1], current_frames.shape[2]
 
@@ -111,7 +111,7 @@ def flow_runner():
 
     while (currentFrame + numFrames - 1) < totalFrames:
         #get grayscale
-        frames_gray = rgb2gray(current_frames)
+        frames_gray = cv2.cvtColor(im, cv2.COLOR_BGR2GRAY)
 
         #get all derivatives
 
@@ -157,7 +157,13 @@ def flow_runner():
         #append to output video
 
         currentFrame += numFrames
-        current_frames, __ = loadVideo(input, currentFrame+numFrames, numFrames)
+        current_frames, __ = loadVideo(filename, currentFrame+numFrames, numFrames)
         numFrames = current_frames.shape[0]
+
+    #setup output video
+    #easy fps = 29.97
+    #med fps = 30.01
+    #hard fps = 30.33
+    imageio.mimsave(filename+"_output.mp4", output_frames, format="MP4", fps="29")
     
     return 0
