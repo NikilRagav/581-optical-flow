@@ -12,6 +12,8 @@ from skimage import feature
 from PIL import Image
 import imageio
 
+from findDerivatives import findDerivatives
+
 
 def rgb2gray(rgb):
   return np.dot(rgb[...,:3], [0.299, 0.587, 0.114])
@@ -26,9 +28,10 @@ def flow_runner():
     (we should keep the last frame of every set of 10 so that we can 
      make sure we track the same feature across each set of frames)
 
-
     take in the video 
     as a numFramesxHxWxnumColors np array
+    where the first frame of the set is the last frame of the previous
+    (in the case of the first time, the first frame is the first frame in the video)
     
     compute the grayscale version
     numFramesxHxW
@@ -44,13 +47,15 @@ def flow_runner():
 
 
     Find corners in each frame
-    Find corresponding points 
-
+    numFramesxnumCornersx2
+    Find corresponding points between each pair of frames
+    (numFrames-1)xnumCorners
+    (boolean matrix)
 
 
 
     For each frame
-    for each 10x10 patch 
+    for each 11x11 patch 
     [[
         sum(Ix*Ix)      sum(Ix*Iy)
         sum(Ix*Iy)      sum(Iy*Iy)
@@ -83,4 +88,26 @@ def flow_runner():
     Let's load 10 frames at a time so we don't take up too much ram and also so that we can calculate flow correctly 
     even if objects leave the frame etc
     '''
+
+    #load video 
+
+    #number of frames to calculate at a time
+    numFrames = 10
+
+    #H, W, color channels come from the video file itself
+    H,W = 10,10
+
+    current_frames = np.zeros((numFrames, H, W, 3))
+
+    frames_gray = rgb2gray(current_frames)
+
+    #unfortunately convolve2d doesn't broacast in 3D
+    frames_Ix = np.zeros((numFrames, H, W, 3))
+    frames_Iy = np.zeros((numFrames, H, W, 3))
+
+    for i in range(numFrames):
+        __, frames_Ix[i], frames_Iy[i], __ = findDerivatives(frames_gray[i])
+
+    frames_It = current_frames[1:] - current_frames[0:-1]
+    
     return 0
