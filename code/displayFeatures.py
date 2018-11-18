@@ -15,7 +15,7 @@ def displayFeatures(filename):
 	for i in range(0, numObjects):
 		bbox_list, newImage = getBoundingBox(im, bbox_list)
 
-	x, y = getFeatures(im, bbox_list, maxCorners, qualityLevel, minDistance)
+	x, y, _ = getFeatures(im, bbox_list, maxCorners, qualityLevel, minDistance)
 	print(x)
 	print(y)
 
