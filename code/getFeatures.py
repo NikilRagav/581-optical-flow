@@ -3,6 +3,8 @@ import numpy as np
 
 # returns NxF matrix with N row coordinates of the features across F objects
 # returns NxF matrix with N col coordinates of the features across F objects
+
+#if there are fewer features than the maxCorners (N), then pad with the coordinates of the first feature
 def getFeatures(img, bbox, maxCorners, qualityLevel, minDistance):
 
 	first = True
@@ -14,8 +16,8 @@ def getFeatures(img, bbox, maxCorners, qualityLevel, minDistance):
 		x_f = [corner[0][0]+x0 for corner in corners]
 		y_f = [corner[0][1]+y0 for corner in corners]
 
-		x_f = np.vstack(np.pad(x_f, (0, maxCorners-len(x_f)), 'constant', constant_values=-1))
-		y_f = np.vstack(np.pad(y_f, (0, maxCorners-len(y_f)), 'constant', constant_values=-1))
+		x_f = np.vstack(np.pad(x_f, (0, maxCorners-len(x_f)), 'constant', constant_values=x_f[0]))
+		y_f = np.vstack(np.pad(y_f, (0, maxCorners-len(y_f)), 'constant', constant_values=y_f[0]))
 
 		if first:
 			x = x_f
