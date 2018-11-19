@@ -188,7 +188,7 @@ def flow_runner():
         for i in range(maxIterations):
             if np.min( abs(np.linalg.eigvals(A)) ) >= minAccuracy:
                 #keep calculating uv
-                print("dummy var")
+                
                 #calculate It (making sure to interpolate)
 
 
