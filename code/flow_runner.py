@@ -23,75 +23,22 @@ def rgb2gray(rgb):
 def bgr2gray(bgr):
   return np.dot(bgr[...,:3], [0.114,0.587,0.299])
 
+#CONSTANTS
+numFrames = 10 #number of frames to calculate at a time
+
+#constants for corner detection
+maxFeatures = 50
+qualityLevel = .05
+minDistance = (8/360)*H #keep same ratio of 8 pixel distance for a 360p video regardless of resolution
+
+windowsize = 9
+half_window = np.floor(windowsize/2)
+
+maxIterations = 5 #stanford paper says 5 should be enough http://robots.stanford.edu/cs223b04/algo_tracking.pdf 
+minAccuracy = .01 #sandipan suggests this is enough
+
+
 def flow_runner():
-    '''
-    It probably makes sense to do this 10 frames at a time.
-    That way, we don't store huge amounts of data in RAM.
-
-    (we should keep the last frame of every set of 10 so that we can 
-     make sure we track the same feature across each set of frames)
-
-    take in the video 
-    as a numFramesxHxWxnumColors np array
-    where the first frame of the set is the last frame of the previous
-    (in the case of the first time, the first frame is the first frame in the video)
-    
-    compute the grayscale version
-    numFramesxHxW
-
-    compute Ix (convolve with vertical sobel and broadcast)
-    numFramesxHxW
-
-    compute Iy (horizontal sobel and broadcast)
-    numFramesxHxW
-
-    compute It
-    (numFrames-1)xHxW
-
-
-    Find corners in each frame
-    numFramesxnumCornersx2
-    Find corresponding points between each pair of frames
-    (numFrames-1)xnumCorners
-    (boolean matrix)
-
-
-
-    For each frame
-    for each 11x11 patch 
-    [[
-        sum(Ix*Ix)      sum(Ix*Iy)
-        sum(Ix*Iy)      sum(Iy*Iy)
-    ]]
-
-    *
-    [[
-        u
-        v
-    ]]
-
-    =
-
-    -[[
-        sum(Ix*It)
-        sum(Iy*It)
-    ]]
-
-    We can collect all of the A and b for all the windows and solve all the u v at once
-    Because solve() broadcasts in 3D
-
-    A  must be (numWindows, 2, 2)
-    b  must be (numWindows, 2, 1)
-    uv will be (numWindows, 2, 1)
-
-    uv = np.linalg.solve(A, b)
-
-    we'll have to iteratively do this a few times
-
-    Let's load 10 frames at a time so we don't take up too much ram and also so that we can calculate flow correctly 
-    even if objects leave the frame etc
-    '''
-
     #filepaths for input and output
     in_folder = "input_videos/"
     out_folder = "input_videos/"
@@ -100,11 +47,9 @@ def flow_runner():
     in_video_path = os.path.join(in_folder,filename)
     out_video_path = os.path.join(out_folder,filename)
 
-    #number of frames to calculate at a time
-    numFrames = 10
+
+
     currentFrame = 0
-
-
     current_frames, totalFrames, fps = loadVideo(in_video_path, currentFrame, numFrames)
     #H, W come from the video file itself
     numFrames, H,W = current_frames.shape[0], current_frames.shape[1], current_frames.shape[2]
@@ -116,31 +61,21 @@ def flow_runner():
     #let user draw bounding box on frame[0]
     # for now we'll just do the tracking on the whole frame
 
-    #constants for corner detection
-    maxFeatures = 50
-    qualityLevel = .05
-    minDistance = (8/360)*H #keep same ratio of 8 pixel distance for a 360p video regardless of resolution
-
-    windowsize = 9
-    half_window = np.floor(windowsize/2)
+    
 
     while (currentFrame + numFrames - 1) < totalFrames:
         #get grayscale
         frames_gray = bgr2gray(current_frames)
 
-        # #pad all frames by floor(windowsize/2) along all sides
-        # frames_gray_padded = np.pad(frames_gray, ( (half_window,half_window), (half_window,half_window) ), mode='reflect')
+        
+        #get derivatives
 
-        #get all derivatives
-
-        #unfortunately convolve2d doesn't broacast in 3D
+        #unfortunately convolve2d doesn't broadcast in 3D
         frames_Ix = np.zeros((numFrames-1, H, W))
         frames_Iy = np.zeros((numFrames-1, H, W))
 
         for i in range(numFrames):
             __, frames_Ix[i], frames_Iy[i], __ = findDerivatives(frames_gray[i])
-
-        frames_It = frames_gray[1:] - frames_gray[0:-1]
 
         #get features
         #goddamnit please vectorize APIs!!
@@ -148,40 +83,54 @@ def flow_runner():
         for i in range(numFrames):
             __, __, feature_list[i] = getFeatures(frames_gray[i], (0,0,W,H), maxFeatures, qualityLevel, minDistance)
         # for now, we'll just do the whole frame
-        zaxis = np.rollaxis( np.rollaxis( np.outer(np.ones((1,maxFeatures,1)), np.arange(3) )[np.newaxis, :], 2, 0), 2, 1)
+        zaxis = np.rollaxis( np.rollaxis( np.outer(np.ones((1,maxFeatures,1)), np.arange(numFrames) )[np.newaxis, :], 2, 0), 2, 1)
         feature_list = np.concatenate( (zaxis, feature_list), axis=2)
         #now it is z,x,y coordinates (where z is frame number)
 
         #do actual calc across all frames
-        uv = np.zeros( (numFrames-1, maxFeatures, 2))
+        uv = np.zeros( (numFrames-1, maxFeatures, 2, 1))
 
         #calculate the sum of derivatives in the windows around each feature point
         summation_kernel = np.ones( (windowsize,windowsize) )
-        frames_summed_Ix = np.zeros_like(frames_Ix)
-        frames_summed_Iy = np.zeros_like(frames_Ix)
-        frames_summed_It = np.zeros_like(frames_Ix)
-        frames_summed_Ix_squared = np.zeros_like(frames_Ix)
-        frames_summed_Iy_squared = np.zeros_like(frames_Ix)
-        frames_summed_Ix_Iy = np.zeros_like(frames_Ix)
-        frames_summed_Ix_It = np.zeros_like(frames_Ix)
-        frames_summed_Iy_It = np.zeros_like(frames_Ix)
+        
+        #these are never used
+        #frames_Ix_summed = np.zeros_like(frames_Ix)
+        #frames_Iy_summed = np.zeros_like(frames_Ix)
+        #frames_It_summed = np.zeros_like(frames_Ix)
+
+        frames_Ix_Ix_summed = np.zeros_like(frames_Ix)
+        frames_Iy_Iy_summed = np.zeros_like(frames_Ix)
+        frames_Ix_Iy_summed = np.zeros_like(frames_Ix)
+        frames_Ix_It_summed = np.zeros_like(frames_Ix)
+        frames_Iy_It_summed = np.zeros_like(frames_Ix)
         for i in range(numFrames-1):
-            frames_summed_Ix[i] = signal.convolve2d(frames_Ix, summation_kernel, mode='same', boundary='symm')
-            frames_summed_Iy[i] = signal.convolve2d(frames_Iy, summation_kernel, mode='same', boundary='symm')
-            frames_summed_It[i] = signal.convolve2d(frames_It, summation_kernel, mode='same', boundary='symm')
-        frames_summed_Ix_squared = frames_summed_Ix * frames_summed_Ix
-        frames_summed_Iy_squared = frames_summed_Iy * frames_summed_Iy
-        frames_summed_Ix_Iy = frames_summed_Ix * frames_summed_Iy
-        frames_summed_Ix_It = frames_summed_Ix * frames_summed_Iy
-        frames_summed_Iy_It = frames_summed_Ix * frames_summed_Iy
+            #these aren't ever used
+            #frames_Ix_summed[i] = signal.convolve2d(frames_Ix, summation_kernel, mode='same', boundary='symm')
+            #frames_Iy_summed[i] = signal.convolve2d(frames_Iy, summation_kernel, mode='same', boundary='symm')
+            #frames_It_summed[i] = signal.convolve2d(frames_It, summation_kernel, mode='same', boundary='symm')
+
+            frames_Ix_Ix_summed[i] = signal.convolve2d(frames_Ix*frames_Ix, summation_kernel, mode='same', boundary='symm')
+            frames_Iy_Iy_summed[i] = signal.convolve2d(frames_Iy*frames_Iy, summation_kernel, mode='same', boundary='symm')
+            frames_Ix_Iy_summed[i] = signal.convolve2d(frames_Ix*frames_Iy, summation_kernel, mode='same', boundary='symm')
 
         #create the A matrix and b vector at each feature point
         '''
         for each feature point in each frame 
+        Take the all the points in the window around the feature point
+        Window:
+        [[
+            pt  pt     pt    pt  pt
+            pt  pt     pt    pt  pt
+            pt  pt  feature  pt  pt
+            pt  pt     pt    pt  pt
+            pt  pt     pt    pt  pt
+        ]]
+
+
         A * uv = -b
         [[
-            sum(Ix*Ix)      sum(Ix)*sum(Iy)
-            sum(Ix)*sum(Iy)      sum(Iy*Iy)
+            sum( Ix(pointInWindow) * Ix(pointInWindow) )      sum( Ix(pointInWindow) * Iy(pointInWindow) )
+            sum( Ix(pointInWindow) * Iy(pointInWindow) )      sum( Iy(pointInWindow) * Iy(pointInWindow) )
         ]]
 
         *
@@ -193,16 +142,56 @@ def flow_runner():
         =
 
         -[[
-            sum(Ix*It)
-            sum(Iy*It)
+            sum( Ix(pointInWindow) * It(pointInWindow+u) )
+            sum( Iy(pointInWindow) * It(pointInWindow+v) )
         ]]
+        where It = frame_gray[i+1][pointInWindowCoords+uv] - frame_gray[i][pointInWindowCoords]
         '''
-        #A is size (numFrames-1)xmaxFeaturesx2x2
-        A = 
+        #A matrix need only be created once
+        #b matrix needs to be created every iteration of the solver with interpolation
 
-        #B is size (numFrames-1)xmaxFeaturesx2x1
+        A = np.zeros( (numFrames-1),maxFeatures,2,2 )
+        b = np.zeros( ((numFrames-1),maxFeatures,2,1) )
+        uv = np.zeros( ((numFrames-1),maxFeatures,2,1) )
 
-        #uv is size (numFrames-1)xmaxFeaturesx2x1
+        #I want every pair of frameNum and featureNum to index A,b,uv correctly
+        '''
+        frameNum    featureNum
+        0           0
+        0           1
+        ...         ...
+        0           maxFeatures-1
+        1           0
+        1           1
+        ...         ...
+        1           maxFeatures-1
+        ...         ...
+        numFrames-1 maxFeatures-1
+        '''
+
+        '''
+        This was unnecessary
+        frameFeatPairs = np.concatenate( ( (np.arange((numFrames-1)*maxFeatures)/(maxFeatures)).astype(int).reshape(-1,1),
+                                           (np.arange((numFrames-1)*maxFeatures)%(maxFeatures)).astype(int).reshape(-1,1)
+                                         ), axis=1 )
+        '''
+
+        A[ :, :, 0,0 ] = frames_Ix_Ix_summed[feature_list[0], feature_list[1], feature_list[2]]
+        A[ :, :, 0,1 ] = frames_Ix_Iy_summed[feature_list[0], feature_list[1], feature_list[2]]
+        A[ :, :, 1,0 ] = frames_Ix_Iy_summed[feature_list[0], feature_list[1], feature_list[2]]
+        A[ :, :, 1,1 ] = frames_Iy_Iy_summed[feature_list[0], feature_list[1], feature_list[2]]
+        
+
+        #run till we've reached maxIterations or till our answer is good enough
+        for i in range(maxIterations):
+            if np.min( abs(np.linalg.eigvals(A)) ) >= minAccuracy:
+                #keep calculating uv
+
+                #calculate It (making sure to interpolate)
+
+
+
+            #if all the error terms are less than our threshold, all of our uv vectors are close enough to correct
 
         uv.reshape( (numFrames-1, maxFeatures, 2) )
 
