@@ -74,16 +74,16 @@ def flow_runner():
         frames_Ix = np.zeros((numFrames-1, H, W))
         frames_Iy = np.zeros((numFrames-1, H, W))
 
-        for i in range(numFrames):
+        for i in range(numFrames-1):
             __, frames_Ix[i], frames_Iy[i], __ = findDerivatives(frames_gray[i])
 
         #get features
         #goddamnit please vectorize APIs!!
-        feature_list = np.zeros( (numFrames, maxFeatures, 2) )
-        for i in range(numFrames):
+        feature_list = np.zeros( (numFrames-1, maxFeatures, 2) )
+        for i in range(numFrames-1):
             __, __, feature_list[i] = getFeatures(frames_gray[i], (0,0,W,H), maxFeatures, qualityLevel, minDistance)
         # for now, we'll just do the whole frame
-        zaxis = np.rollaxis( np.rollaxis( np.outer(np.ones((1,maxFeatures,1)), np.arange(numFrames) )[np.newaxis, :], 2, 0), 2, 1)
+        zaxis = np.rollaxis( np.rollaxis( np.outer(np.ones((1,maxFeatures,1)), np.arange(numFrames-1) )[np.newaxis, :], 2, 0), 2, 1)
         feature_list = np.concatenate( (zaxis, feature_list), axis=2)
         #now it is z,x,y coordinates (where z is frame number)
 
