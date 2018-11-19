@@ -6,7 +6,7 @@ import numpy as np
 #return a 10xHxWx3 matrix
 def loadVideo(filename, start, numFrames):
 	vid = cv2.VideoCapture(filename)
-	fps = vid.get(cv2.cv.CV_CAP_PROP_FPS)
+	fps = vid.get(cv2.CAP_PROP_FPS)
 	status, img = vid.read()
 	frame_data = []
 	length = int(vid.get(cv2.CAP_PROP_FRAME_COUNT))

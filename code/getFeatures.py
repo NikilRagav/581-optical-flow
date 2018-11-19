@@ -8,7 +8,8 @@ def getFeatures(img, bbox, maxCorners, qualityLevel, minDistance):
 	first = True
 	for (x0, y0, w, h) in bbox:
 		window = img[y0:y0+h, x0:x0+w]
-		corners = (cv2.goodFeaturesToTrack(window, maxCorners, 0.01, qualityLevel, minDistance)).astype(int)
+		window = cv2.cvtColor(window, cv2.COLOR_BGR2GRAY)
+		corners = np.int0(cv2.goodFeaturesToTrack(window, maxCorners, 0.01, qualityLevel, minDistance))
 
 		x_f = [corner[0][0]+x0 for corner in corners]
 		y_f = [corner[0][1]+y0 for corner in corners]

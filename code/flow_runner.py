@@ -110,7 +110,7 @@ def flow_runner():
     numFrames, H,W = current_frames.shape[0], current_frames.shape[1], current_frames.shape[2]
 
     #open output video file
-    fourcc = cv2.VideoWriter_fourcc(*'MP4V')
+    fourcc = cv2.VideoWriter_fourcc(*'mp4v')
     out = cv2.VideoWriter(out_video_path, fourcc, fps, (W,H))
 
     #let user draw bounding box on frame[0]
@@ -125,19 +125,21 @@ def flow_runner():
     half_window = np.floor(windowsize/2)
 
     while (currentFrame + numFrames - 1) < totalFrames:
-        #get grayscale
-        frames_gray = bgr2gray(current_frames)
+        #get grayscale - doing it in the get Features func instead since it was throwing errors
+        frames_gray = bgr2gray(current_frames) #?
 
         # #pad all frames by floor(windowsize/2) along all sides
         # frames_gray_padded = np.pad(frames_gray, ( (half_window,half_window), (half_window,half_window) ), mode='reflect')
 
         #get all derivatives
-
         #unfortunately convolve2d doesn't broacast in 3D
         frames_Ix = np.zeros((numFrames-1, H, W))
         frames_Iy = np.zeros((numFrames-1, H, W))
 
-        for i in range(numFrames):
+        print(frames_Iy.shape)
+        print(frames_Ix.shape)
+        print(frames_gray.shape)
+        for i in range(numFrames-1): #?
             __, frames_Ix[i], frames_Iy[i], __ = findDerivatives(frames_gray[i])
 
         frames_It = frames_gray[1:] - frames_gray[0:-1]
@@ -146,10 +148,12 @@ def flow_runner():
         #goddamnit please vectorize APIs!!
         feature_list = np.zeros( (numFrames, maxFeatures, 2) )
         for i in range(numFrames):
-            __, __, feature_list[i] = getFeatures(frames_gray[i], (0,0,W,H), maxFeatures, qualityLevel, minDistance)
+            __, __, feature_list[i] = getFeatures(current_frames[i], [(0,0,W,H)], maxFeatures, qualityLevel, minDistance)
         # for now, we'll just do the whole frame
         zaxis = np.rollaxis( np.rollaxis( np.outer(np.ones((1,maxFeatures,1)), np.arange(3) )[np.newaxis, :], 2, 0), 2, 1)
-        feature_list = np.concatenate( (zaxis, feature_list), axis=2)
+        print(zaxis.shape)
+        print(feature_list.shape)
+        feature_list = np.concatenate( (zaxis, feature_list), axis=2) #?
         #now it is z,x,y coordinates (where z is frame number)
 
         #do actual calc across all frames
@@ -198,7 +202,7 @@ def flow_runner():
         ]]
         '''
         #A is size (numFrames-1)xmaxFeaturesx2x2
-        A = 
+        # A = 
 
         #B is size (numFrames-1)xmaxFeaturesx2x1
 
@@ -214,6 +218,11 @@ def flow_runner():
 
         #at the end of the actual calc,
         # we should have a (numFrames-1)xmaxFeaturesx2 vector with u v values for each feature in each frame
+        for i in range(numFrames-1):
+            for j in range(maxFeatures):
+                u = displacement[i][j][0]
+                v = displacement[i][j][1]
+                x = feature_list()
 
         #get the vectors to draw
         #throw out the vectors for image points that were originally not in the image
@@ -243,3 +252,6 @@ def flow_runner():
     cv2.destroyAllWindows()
 
     return 0
+
+if __name__ == '__main__':
+    flow_runner()
