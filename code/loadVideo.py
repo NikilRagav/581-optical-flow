@@ -10,6 +10,8 @@ def loadVideo(filename, start, numFrames):
 	status, img = vid.read()
 	frame_data = []
 	length = int(vid.get(cv2.CAP_PROP_FRAME_COUNT))
+	w = int(vid.get(cv2.CAP_PROP_FRAME_WIDTH))
+	h = int(vid.get(cv2.CAP_PROP_FRAME_HEIGHT))
 
 	start_frame = start
 	if start is not 0:
@@ -25,4 +27,5 @@ def loadVideo(filename, start, numFrames):
 		frame_data.append(img)
 		status, img = vid.read()
 		cnt += 1
-	return np.array(frame_data), length, fps
+	vid.release()
+	return np.array(frame_data), length, h, w, fps

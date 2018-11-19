@@ -29,7 +29,6 @@ numFrames = 10 #number of frames to calculate at a time
 #constants for corner detection
 maxFeatures = 50
 qualityLevel = .05
-minDistance = (8/360)*H #keep same ratio of 8 pixel distance for a 360p video regardless of resolution
 
 windowsize = 9
 half_window = np.floor(windowsize/2)
@@ -53,6 +52,7 @@ def flow_runner():
     current_frames, totalFrames, fps = loadVideo(in_video_path, currentFrame, numFrames)
     #H, W come from the video file itself
     numFrames, H,W = current_frames.shape[0], current_frames.shape[1], current_frames.shape[2]
+    minDistance = (8/360)*H #keep same ratio of 8 pixel distance for a 360p video regardless of resolution
 
     #open output video file
     fourcc = cv2.VideoWriter_fourcc(*'mp4v')
@@ -188,7 +188,7 @@ def flow_runner():
         for i in range(maxIterations):
             if np.min( abs(np.linalg.eigvals(A)) ) >= minAccuracy:
                 #keep calculating uv
-
+                print("dummy var")
                 #calculate It (making sure to interpolate)
 
 
