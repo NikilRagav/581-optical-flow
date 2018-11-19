@@ -8,7 +8,7 @@ import numpy as np
 def getFeatures(img, bbox, maxCorners, qualityLevel, minDistance):
 
 	first = True
-	for x0, y0, w, h in bbox:
+	for (x0, y0, w, h) in bbox:
 		window = img[y0:y0+h, x0:x0+w]
 		corners = (cv2.goodFeaturesToTrack(window, maxCorners, 0.01, qualityLevel, minDistance)).astype(int)
 
@@ -26,4 +26,4 @@ def getFeatures(img, bbox, maxCorners, qualityLevel, minDistance):
 			x = np.append(x, x_f, axis=1)
 			y = np.append(y, y_f, axis=1)
 
-		return x, y, np.concatenate((y,x), axis=1)
+	return x, y, np.concatenate((y,x), axis=1)
