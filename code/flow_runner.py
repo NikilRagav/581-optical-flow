@@ -42,11 +42,11 @@ def flow_runner(numFrames, maxFeatures, qualityLevel, minDistance, windowsize, h
     numFrames = current_frames.shape[0]
     minDistance /=H #keep same ratio of 8 pixel distance / 360p of resolution video regardless of resolution
 
-    '''
+    
     #open output video file
     fourcc = cv2.VideoWriter_fourcc(*'mp4v')
     out = cv2.VideoWriter(out_video_path, fourcc, fps, (W,H))
-    '''
+    
 
     #let user draw bounding box on frame[0]
     # for now we'll just do the tracking on the whole frame
@@ -303,7 +303,7 @@ def flow_runner(numFrames, maxFeatures, qualityLevel, minDistance, windowsize, h
             out.write(frame)
 
         currentFrame += numFrames
-        current_frames, __ = loadVideo(filename, currentFrame+numFrames, numFrames)
+        current_frames, __, __, __, __ = loadVideo(filename, currentFrame+numFrames, numFrames)
         numFrames = current_frames.shape[0]
 
     #setup output video
