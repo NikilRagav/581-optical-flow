@@ -9,8 +9,8 @@ def getBoundingBox(im, bbox_list, bbox_pts):
 	p1 = [bbox[0]+bbox[2], bbox[1]]
 	p2 = [bbox[0], bbox[1] + bbox[3]]
 	p3 = [bbox[0]+bbox[2], bbox[1] + bbox[3]]
-	pts = np.vstack(p1, p2, p3, p4)
-	bboxpts.append(pts)
+	pts = np.vstack((p0, p1, p2, p3))
+	bbox_pts.append(pts)
 	new_img = cv2.rectangle(im, (bbox[0], bbox[1]), (bbox[0]+bbox[2], bbox[1]+bbox[3]), (0, 255, 0), 2)
 	#cv2.imwrite("tester_output.jpg", new_img)
 

@@ -8,7 +8,7 @@ def applyGeometricTransformation(startXs, startYs, newXs, newYs, bbox):
 	[numFeatures, numObjects] = startXs.shape
 	Xs = []
 	Ys = []
-	newbbox = np.full(np.array(bbox), fill_value=-1)
+	newbbox = np.full(np.array(bbox).shape, fill_value=-1)
 
 	for i in range(numObjects):
 		startX = startXs[:, i]
@@ -38,7 +38,7 @@ def applyGeometricTransformation(startXs, startYs, newXs, newYs, bbox):
 		else:
 			np.append(Ys, newY)
 
-		startBox = np.vstack((np.matrix.transpose(bbox[i,:,:]), np.ones(4)))
+		startBox = np.vstack((np.matrix.transpose(np.array(bbox[i,:,:])), np.ones(4)))
 		newBox = np.dot(trans.params, startBox)
 		newbbox[i,:,:] = np.matrix.transpose(newBox[0:2,:])
 

@@ -12,9 +12,10 @@ def displayFeatures(filename):
 	im = cv2.imread(filename)
 	im = cv2.cvtColor(im, cv2.COLOR_BGR2GRAY)
 	bbox_list = []
+	bbox_pts = []
 	for i in range(0, numObjects):
-		bbox_list, newImage = getBoundingBox(im, bbox_list)
-
+		bbox_list, bbox_pts, newImage = getBoundingBox(im, bbox_list, bbox_pts)	
+	print(bbox_pts)
 	x, y, _ = getFeatures(im, bbox_list, maxCorners, qualityLevel, minDistance)
 	print(x)
 	print(y)
