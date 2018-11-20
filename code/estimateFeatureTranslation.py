@@ -53,3 +53,51 @@ def estimateFeatureTranslation(startX, startY, Ix, Iy, img1, img2):
 	newX = startX + u
 	newY = startY + v
 	return newX, newY
+
+if __name__ == '__main__':
+	# setup video capture
+	cap = cv2.VideoCapture("input_videos/Easy.mp4")
+	ret,img1 = cap.read()
+	ret,img2 = cap.read()
+	cap.release()
+
+	img1 = np.array(img1)
+	img2 = np.array(img2)
+
+	maxCorners = 20
+	qualityLevel = 0.01
+	minDistance = 8
+
+	bbox_list = []
+	bbox_pts = []
+	bbox_list, bbox_pts, new_img = getBoundingBox(img1, bbox_list, bbox_pts)
+	img1_gray = cv2.cvtColor(img1, cv2.COLOR_BGR2GRAY)
+	img2_gray = cv2.cvtColor(img2, cv2.COLOR_BGR2GRAY)
+	x, y, _ = getFeatures(img1_gray, bbox_list, maxCorners, qualityLevel, minDistance)
+	Ix, Iy = np.gradient(img1_gray)
+	Ix = np.array(Ix)
+	Iy = np.array(Iy)
+
+	newXs = []
+	newYs = []
+	for i in range(len(x)):
+		for j in range(len(x[i])):
+		  startX = x[i][j]
+		  startY = y[i][j]
+		  newX, newY = estimateFeatureTranslation(startX, startY, Ix, Iy, img1_gray, img2_gray)
+		  newXs.append(newX)
+		  newYs.append(newY)
+
+	print(len(newXs))
+	print(len(newYs))
+
+	plt.figure()
+	plt.imshow(img1_gray, cmap='gray')
+	plt.plot(x, y, 'r+')
+	plt.axis('off')
+
+	plt.figure()
+	plt.imshow(img2_gray, cmap='gray')
+	plt.plot(newXs, newYs, 'r+')
+	plt.axis('off')
+	plt.show()
