@@ -25,24 +25,6 @@ def bgr2gray(bgr):
   return np.dot(bgr[...,:3], [0.114,0.587,0.299])
 
 
-if __name__ == "__main__":
-    #CONSTANTS
-    numFrames = 10 #number of frames to calculate at a time
-
-    #constants for corner detection
-    maxFeatures = 50
-    qualityLevel = .05
-    minDistance = (8/360) #keep same ratio of 8 pixel distance for a 360p video regardless of resolution
-
-    windowsize = 9
-    half_window = np.floor(windowsize/2)
-
-    maxIterations = 5 #stanford paper says 5 should be enough http://robots.stanford.edu/cs223b04/algo_tracking.pdf 
-    minAccuracy = .01 #sandipan suggests this is enough
-
-    flow_runner(numFrames, maxFeatures, qualityLevel, minDistance, windowsize, half_window, maxIterations, minAccuracy)
-
-
 def flow_runner(numFrames, maxFeatures, qualityLevel, minDistance, windowsize, half_window, maxIterations, minAccuracy):
     #filepaths for input and output
     in_folder = "input_videos/"
@@ -70,7 +52,7 @@ def flow_runner(numFrames, maxFeatures, qualityLevel, minDistance, windowsize, h
 
     while (currentFrame + numFrames - 1) < totalFrames:
         #GET GRAYSCALE
-        frames_gray = bgr2gray(current_frames)
+        frames_gray = bgr2gray(current_frames).astype(int)
 
         
         #GET DERIVATIVES
@@ -89,7 +71,7 @@ def flow_runner(numFrames, maxFeatures, qualityLevel, minDistance, windowsize, h
 
         feature_list = np.zeros( (numFrames-1, maxFeatures, 2) )
         for i in range(numFrames-1):
-            __, __, feature_list[i] = getFeatures(frames_gray[i], (0,0,W,H), maxFeatures, qualityLevel, minDistance)
+            __, __, feature_list[i] = getFeatures(frames_gray[i], [(0,0,W,H)], maxFeatures, qualityLevel, minDistance)
         
         # for now, we'll just do the whole frame
         
@@ -98,6 +80,7 @@ def flow_runner(numFrames, maxFeatures, qualityLevel, minDistance, windowsize, h
         feature_list = np.concatenate( (frames_coords, feature_coords, feature_list), axis=2)
         #now it is a (numFrames-1) x maxFeatures x 4
         #now it is w z y x coordinates (where w is frame number, z is feature number)
+        feature_list = feature_list.astype(int)
 
         #include all the window points around the featurePoint
         #I want a (numFrames-1) x maxFeatures*windowsize*windowsize x 4
@@ -122,7 +105,7 @@ def flow_runner(numFrames, maxFeatures, qualityLevel, minDistance, windowsize, h
         #                      -> windowsize*windowsize*(numFrames-1)*maxFeatures, 4
         feature_windows = (feature_windows + window_overall).reshape(-1,4)
         feature_windows = feature_windows.reshape( (numFrames-1), maxFeatures, -1, 4 )
-
+        feature_windows = feature_windows.astype(int)
 
 
         #CALCULATE FLOW ACROSS ALL FRAMES
@@ -131,10 +114,6 @@ def flow_runner(numFrames, maxFeatures, qualityLevel, minDistance, windowsize, h
         #Calculate the sum of derivatives in the windows around each feature point
         summation_kernel = np.ones( (windowsize,windowsize) )
         
-        #these are never used
-        #frames_Ix_summed = np.zeros_like(frames_Ix)
-        #frames_Iy_summed = np.zeros_like(frames_Ix)
-        #frames_It_summed = np.zeros_like(frames_Ix)
 
         frames_Ix_Ix_summed = np.zeros_like(frames_Ix)
         frames_Iy_Iy_summed = np.zeros_like(frames_Ix)
@@ -142,10 +121,6 @@ def flow_runner(numFrames, maxFeatures, qualityLevel, minDistance, windowsize, h
         frames_Ix_It_summed = np.zeros_like(frames_Ix)
         frames_Iy_It_summed = np.zeros_like(frames_Ix)
         for i in range(numFrames-1):
-            #these are never used
-            #frames_Ix_summed[i] = signal.convolve2d(frames_Ix, summation_kernel, mode='same', boundary='symm')
-            #frames_Iy_summed[i] = signal.convolve2d(frames_Iy, summation_kernel, mode='same', boundary='symm')
-            #frames_It_summed[i] = signal.convolve2d(frames_It, summation_kernel, mode='same', boundary='symm')
 
             frames_Ix_Ix_summed[i] = signal.convolve2d(frames_Ix*frames_Ix, summation_kernel, mode='same', boundary='symm')
             frames_Iy_Iy_summed[i] = signal.convolve2d(frames_Iy*frames_Iy, summation_kernel, mode='same', boundary='symm')
@@ -246,11 +221,11 @@ def flow_runner(numFrames, maxFeatures, qualityLevel, minDistance, windowsize, h
             #skip the first frame values
             #  J is a (numFrames-1)*maxFeatures*windowsize*windowsize, 1
             J = interp2b(frames_gray[1:], (feature_windows[ ..., 0]).reshape(-1,1),
-                                          (feature_windows[ ..., -2]+uv[1]).reshape(-1,1),
-                                          (feature_windows[ ..., -1]+uv[0]).reshape(-1,1))
+                                          (feature_windows[ ..., -2]+uv[...,1,1]).reshape(-1,1),
+                                          (feature_windows[ ..., -1]+uv[...,0,1]).reshape(-1,1))
             
             It = J - I_window_points
-            It = It.reshape(numFrames-1,maxFeatures,-1,1)
+            #It = It.reshape(numFrames-1,maxFeatures,-1,1)
 
             # place all the It values in frames so we can do convolution
             frames_It = np.zeros_like( frames_Ix )
@@ -264,11 +239,11 @@ def flow_runner(numFrames, maxFeatures, qualityLevel, minDistance, windowsize, h
             b[ :, :, 0,0 ] = frames_Ix_It_summed[feature_list[ ..., 0].reshape(-1,1),
                                                  feature_list[ ..., -2].reshape(-1,1),
                                                  feature_list[ ..., -1].reshape(-1,1)]
-            b[ :, :, 1,0 ] = frames_Ix_It_summed[feature_list[ ..., 0].reshape(-1,1),
+            b[ :, :, 1,0 ] = frames_Iy_It_summed[feature_list[ ..., 0].reshape(-1,1),
                                                  feature_list[ ..., -2].reshape(-1,1),
                                                  feature_list[ ..., -1].reshape(-1,1)]
 
-            nu = np.linalg.solve(A,b)
+            nu = np.linalg.solve(A,-b)
             uv += nu
             if np.min( abs(nu) ) <= minAccuracy:
                 break
@@ -285,13 +260,25 @@ def flow_runner(numFrames, maxFeatures, qualityLevel, minDistance, windowsize, h
 
         #at the end of the actual calc,
         # we should have a (numFrames-1)xmaxFeaturesx2 vector with u v values for each feature in each frame
-        for i in range(numFrames-1):
-            for j in range(maxFeatures):
-                u = displacement[i][j][0]
-                v = displacement[i][j][1]
-                x = feature_list()
+        
+        #we know the starting points for each feature. We know the displacement for each point. This is the ending points.
+        uv = uv.astype(int)
+        #flip uv to vu so that it lines up with y,x in the old features list
+        vu = uv[...,np.newaxis,:]
+        vu = vu[...,[1,0]]
+        new_feature_list = feature_list + vu
 
         #get the vectors to draw
+        frames_out = np.copy(current_frames[:-1])
+
+        for i in range(numFrames-1):
+            for j in range(maxFeatures):
+                cv2.line( frames_out[i], (feature_list[i,j,-1],feature_list[i,j,-2]), 
+                                         (new_feature_list[i,j,-1],new_feature_list[i,j,-2]),
+                                         (123,243,233), 5 )
+        for i in range(numFrames-1):
+            plt.imshow(frames_out[i])
+
         #throw out the vectors for image points that were originally not in the image
         # if for a particular frame we ended up with fewer than our maximum number of features
 
@@ -319,3 +306,21 @@ def flow_runner(numFrames, maxFeatures, qualityLevel, minDistance, windowsize, h
     cv2.destroyAllWindows()
 
     return 0
+
+
+if __name__ == "__main__":
+    #CONSTANTS
+    numFrames = 10 #number of frames to calculate at a time
+
+    #constants for corner detection
+    maxFeatures = 50
+    qualityLevel = .05
+    minDistance = (8/360) #keep same ratio of 8 pixel distance for a 360p video regardless of resolution
+
+    windowsize = 9
+    half_window = np.floor(windowsize/2)
+
+    maxIterations = 5 #stanford paper says 5 should be enough http://robots.stanford.edu/cs223b04/algo_tracking.pdf 
+    minAccuracy = .01 #sandipan suggests this is enough
+
+    flow_runner(numFrames, maxFeatures, qualityLevel, minDistance, windowsize, half_window, maxIterations, minAccuracy)
