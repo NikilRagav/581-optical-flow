@@ -122,9 +122,9 @@ def flow_runner(numFrames, maxFeatures, qualityLevel, minDistance, windowsize, h
         frames_Iy_It_summed = np.zeros_like(frames_Ix)
         for i in range(numFrames-1):
 
-            frames_Ix_Ix_summed[i] = signal.convolve2d(frames_Ix*frames_Ix, summation_kernel, mode='same', boundary='symm')
-            frames_Iy_Iy_summed[i] = signal.convolve2d(frames_Iy*frames_Iy, summation_kernel, mode='same', boundary='symm')
-            frames_Ix_Iy_summed[i] = signal.convolve2d(frames_Ix*frames_Iy, summation_kernel, mode='same', boundary='symm')
+            frames_Ix_Ix_summed[i] = signal.convolve2d(frames_Ix[i]*frames_Ix[i], summation_kernel, mode='same', boundary='symm')
+            frames_Iy_Iy_summed[i] = signal.convolve2d(frames_Iy[i]*frames_Iy[i], summation_kernel, mode='same', boundary='symm')
+            frames_Ix_Iy_summed[i] = signal.convolve2d(frames_Ix[i]*frames_Iy[i], summation_kernel, mode='same', boundary='symm')
 
         #create the A matrix and b vector at each feature point
         '''
@@ -190,21 +190,21 @@ def flow_runner(numFrames, maxFeatures, qualityLevel, minDistance, windowsize, h
                                          ), axis=1 )
         '''
 
-        A[ :, :, 0,0 ] = frames_Ix_Ix_summed[feature_list[ ..., 0].reshape(-1,1),
-                                             feature_list[ ..., -2].reshape(-1,1),
-                                             feature_list[ ..., -1].reshape(-1,1)]
+        A[ :, :, 0,0 ] = frames_Ix_Ix_summed[feature_list[ ..., 0],
+                                             feature_list[ ..., -2],
+                                             feature_list[ ..., -1]]
 
-        A[ :, :, 0,1 ] = frames_Ix_Iy_summed[feature_list[ ..., 0].reshape(-1,1),
-                                             feature_list[ ..., -2].reshape(-1,1),
-                                             feature_list[ ..., -1].reshape(-1,1)]
+        A[ :, :, 0,1 ] = frames_Ix_Iy_summed[feature_list[ ..., 0],
+                                             feature_list[ ..., -2],
+                                             feature_list[ ..., -1]]
 
-        A[ :, :, 1,0 ] = frames_Ix_Iy_summed[feature_list[ ..., 0].reshape(-1,1),
-                                             feature_list[ ..., -2].reshape(-1,1),
-                                             feature_list[ ..., -1].reshape(-1,1)]
+        A[ :, :, 1,0 ] = frames_Ix_Iy_summed[feature_list[ ..., 0],
+                                             feature_list[ ..., -2],
+                                             feature_list[ ..., -1]]
 
-        A[ :, :, 1,1 ] = frames_Iy_Iy_summed[feature_list[ ..., 0].reshape(-1,1),
-                                             feature_list[ ..., -2].reshape(-1,1),
-                                             feature_list[ ..., -1].reshape(-1,1)]
+        A[ :, :, 1,1 ] = frames_Iy_Iy_summed[feature_list[ ..., 0],
+                                             feature_list[ ..., -2],
+                                             feature_list[ ..., -1]]
 
         # I_window_points is (numFrames-1)*maxFeatures*windowsize*windowsize, 1
         # the pixel value at each image at each window point
@@ -220,28 +220,28 @@ def flow_runner(numFrames, maxFeatures, qualityLevel, minDistance, windowsize, h
             #J is the pixelvalues of each window point at their projected locations in the next frame
             #skip the first frame values
             #  J is a (numFrames-1)*maxFeatures*windowsize*windowsize, 1
-            J = interp2b(frames_gray[1:], (feature_windows[ ..., 0]).reshape(-1,1),
-                                          (feature_windows[ ..., -2]+uv[...,1,1]).reshape(-1,1),
-                                          (feature_windows[ ..., -1]+uv[...,0,1]).reshape(-1,1))
+            J = interp2b(frames_gray[1:], (feature_windows[ 1:, :, 0]).reshape(-1,1),
+                                          (feature_windows[ 1:, :, -2]+uv[...,1,1]).reshape(-1,1),
+                                          (feature_windows[ 1:, :, -1]+uv[...,0,1]).reshape(-1,1))
             
             It = J - I_window_points
             #It = It.reshape(numFrames-1,maxFeatures,-1,1)
 
             # place all the It values in frames so we can do convolution
             frames_It = np.zeros_like( frames_Ix )
-            frames_It[(feature_windows[ ..., 0]).reshape(-1,1),
-                      (feature_windows[ ..., -2]).reshape(-1,1),
-                      (feature_windows[ ..., -1]).reshape(-1,1)] = It
+            frames_It[(feature_windows[ :-1,:, 0]).reshape(-1,1),
+                      (feature_windows[ :-1,:, -2]).reshape(-1,1),
+                      (feature_windows[ :-1,:, -1]).reshape(-1,1)] = It
             for i in range(numFrames-1):
-                frames_Ix_It_summed = signal.convolve2d(frames_Ix*frames_It, summation_kernel, mode='same', boundary='symm')
-                frames_Iy_It_summed = signal.convolve2d(frames_Iy*frames_It, summation_kernel, mode='same', boundary='symm')
+                frames_Ix_It_summed = signal.convolve2d(frames_Ix[i]*frames_It[i], summation_kernel, mode='same', boundary='symm')
+                frames_Iy_It_summed = signal.convolve2d(frames_Iy[i]*frames_It[i], summation_kernel, mode='same', boundary='symm')
 
-            b[ :, :, 0,0 ] = frames_Ix_It_summed[feature_list[ ..., 0].reshape(-1,1),
-                                                 feature_list[ ..., -2].reshape(-1,1),
-                                                 feature_list[ ..., -1].reshape(-1,1)]
-            b[ :, :, 1,0 ] = frames_Iy_It_summed[feature_list[ ..., 0].reshape(-1,1),
-                                                 feature_list[ ..., -2].reshape(-1,1),
-                                                 feature_list[ ..., -1].reshape(-1,1)]
+            b[ :, :, 0,0 ] = frames_Ix_It_summed[feature_list[ ..., 0],
+                                                 feature_list[ ..., -2],
+                                                 feature_list[ ..., -1]]
+            b[ :, :, 1,0 ] = frames_Iy_It_summed[feature_list[ ..., 0],
+                                                 feature_list[ ..., -2],
+                                                 feature_list[ ..., -1]]
 
             nu = np.linalg.solve(A,-b)
             uv += nu
