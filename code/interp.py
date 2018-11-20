@@ -16,16 +16,16 @@ import pdb
 ##########
 
 def interp2b(v, zq, yq, xq):
-
+	'''
 	if len(xq.shape) == 2 or len(yq.shape) == 2:
 		dim_input = 2
 		q_h = xq.shape[0]
 		q_w = xq.shape[1]
 		xq = xq.flatten()
 		yq = yq.flatten()
-
-	h = v.shape[0]
-	w = v.shape[1]
+	'''
+	h = v.shape[-2]
+	w = v.shape[-1]
 	if xq.shape != yq.shape:
 		raise 'query coordinates Xq Yq should have same shape'
 
@@ -61,10 +61,12 @@ def interp2b(v, zq, yq, xq):
 	w3 = lh * hw
 	w4 = lh * lw
 
-	interp_val = v1 * w1 + w2 * v2 + w3 * v3 + w4 * v4
-
+	interp_val = w1 * v1 + w2 * v2 + w3 * v3 + w4 * v4
+	
+	'''
 	if dim_input == 2:
 		return interp_val.reshape(q_h,q_w)
+	'''
 	return interp_val
 
 

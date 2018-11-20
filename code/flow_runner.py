@@ -42,9 +42,11 @@ def flow_runner(numFrames, maxFeatures, qualityLevel, minDistance, windowsize, h
     numFrames = current_frames.shape[0]
     minDistance /=H #keep same ratio of 8 pixel distance / 360p of resolution video regardless of resolution
 
+    '''
     #open output video file
     fourcc = cv2.VideoWriter_fourcc(*'mp4v')
     out = cv2.VideoWriter(out_video_path, fourcc, fps, (W,H))
+    '''
 
     #let user draw bounding box on frame[0]
     # for now we'll just do the tracking on the whole frame
@@ -104,12 +106,11 @@ def flow_runner(numFrames, maxFeatures, qualityLevel, minDistance, windowsize, h
         #feature_windows becomes  windowsize*windowsize, (numFrames-1)*maxFeatures, 4
         #                      -> windowsize*windowsize*(numFrames-1)*maxFeatures, 4
         feature_windows = (feature_windows + window_overall).reshape(-1,4)
-        feature_windows = feature_windows.reshape( (numFrames-1), maxFeatures, -1, 4 )
+        feature_windows = feature_windows.reshape( (numFrames-1), -1, 4 )
         feature_windows = feature_windows.astype(int)
 
 
         #CALCULATE FLOW ACROSS ALL FRAMES
-        uv = np.zeros( (numFrames-1, maxFeatures, 2, 1))
 
         #Calculate the sum of derivatives in the windows around each feature point
         summation_kernel = np.ones( (windowsize,windowsize) )
@@ -167,6 +168,8 @@ def flow_runner(numFrames, maxFeatures, qualityLevel, minDistance, windowsize, h
         b = np.zeros(  ((numFrames-1),maxFeatures,2,1) )
         uv = np.zeros( ((numFrames-1),maxFeatures,2,1) )
 
+        uv_window_points = ( uv[:,:,np.newaxis]+np.zeros((windowsize*windowsize, 2, 1)) ).reshape(numFrames-1, -1, 2,1)
+
         #I want every pair of frameNum and featureNum to index A,b,uv correctly
         '''
         frameNum    featureNum
@@ -220,21 +223,21 @@ def flow_runner(numFrames, maxFeatures, qualityLevel, minDistance, windowsize, h
             #J is the pixelvalues of each window point at their projected locations in the next frame
             #skip the first frame values
             #  J is a (numFrames-1)*maxFeatures*windowsize*windowsize, 1
-            J = interp2b(frames_gray[1:], (feature_windows[ 1:, :, 0]).reshape(-1,1),
-                                          (feature_windows[ 1:, :, -2]+uv[...,1,1]).reshape(-1,1),
-                                          (feature_windows[ 1:, :, -1]+uv[...,0,1]).reshape(-1,1))
+            J = interp2b(frames_gray[1:], (feature_windows[ ..., 0]).reshape(-1,1),
+                                          (feature_windows[ ..., -2]+uv_window_points[...,1,0]).reshape(-1,1),
+                                          (feature_windows[ ..., -1]+uv_window_points[...,0,0]).reshape(-1,1))
             
             It = J - I_window_points
             #It = It.reshape(numFrames-1,maxFeatures,-1,1)
 
             # place all the It values in frames so we can do convolution
             frames_It = np.zeros_like( frames_Ix )
-            frames_It[(feature_windows[ :-1,:, 0]).reshape(-1,1),
-                      (feature_windows[ :-1,:, -2]).reshape(-1,1),
-                      (feature_windows[ :-1,:, -1]).reshape(-1,1)] = It
+            frames_It[(feature_windows[ ..., 0]).reshape(-1,1),
+                      (feature_windows[ ..., -2]).reshape(-1,1),
+                      (feature_windows[ ..., -1]).reshape(-1,1)] = It
             for i in range(numFrames-1):
-                frames_Ix_It_summed = signal.convolve2d(frames_Ix[i]*frames_It[i], summation_kernel, mode='same', boundary='symm')
-                frames_Iy_It_summed = signal.convolve2d(frames_Iy[i]*frames_It[i], summation_kernel, mode='same', boundary='symm')
+                frames_Ix_It_summed[i] = signal.convolve2d(frames_Ix[i]*frames_It[i], summation_kernel, mode='same', boundary='symm')
+                frames_Iy_It_summed[i] = signal.convolve2d(frames_Iy[i]*frames_It[i], summation_kernel, mode='same', boundary='symm')
 
             b[ :, :, 0,0 ] = frames_Ix_It_summed[feature_list[ ..., 0],
                                                  feature_list[ ..., -2],
@@ -245,12 +248,18 @@ def flow_runner(numFrames, maxFeatures, qualityLevel, minDistance, windowsize, h
 
             nu = np.linalg.solve(A,-b)
             uv += nu
-            if np.min( abs(nu) ) <= minAccuracy:
+
+            #propagate uv to all points in the window
+            uv_perp = np.zeros( (numFrames-1, windowsize*windowsize, maxFeatures, 2, 1) )
+            uv_big = uv[:, np.newaxis, ...] + uv_perp
+            uv_window_points = ( np.rollaxis(uv_big, -4,-2) ).reshape(numFrames-1, -1, 2, 1)
+
+            if np.max( np.linalg.norm(nu, axis=-2) ) <= minAccuracy:
                 break
 
             #if all the error terms are less than our threshold, all of our uv vectors are close enough to correct
 
-        uv.reshape( (numFrames-1, maxFeatures, 2) )
+        uv = uv.reshape( (numFrames-1, maxFeatures, 2) )
 
         '''
         output of calc: (numFrames-1)xmaxFeaturesx2
@@ -262,11 +271,11 @@ def flow_runner(numFrames, maxFeatures, qualityLevel, minDistance, windowsize, h
         # we should have a (numFrames-1)xmaxFeaturesx2 vector with u v values for each feature in each frame
         
         #we know the starting points for each feature. We know the displacement for each point. This is the ending points.
-        uv = uv.astype(int)
+        #uv = np.round(uv).astype(int)
         #flip uv to vu so that it lines up with y,x in the old features list
-        vu = uv[...,np.newaxis,:]
-        vu = vu[...,[1,0]]
-        new_feature_list = feature_list + vu
+        vu = np.zeros_like(feature_list, dtype=float)
+        vu[...,[-2,-1]] = uv * 10 #make the vector arrows longer so we can see
+        new_feature_list = (feature_list + vu).astype(int)
 
         #get the vectors to draw
         frames_out = np.copy(current_frames[:-1])
@@ -275,9 +284,9 @@ def flow_runner(numFrames, maxFeatures, qualityLevel, minDistance, windowsize, h
             for j in range(maxFeatures):
                 cv2.line( frames_out[i], (feature_list[i,j,-1],feature_list[i,j,-2]), 
                                          (new_feature_list[i,j,-1],new_feature_list[i,j,-2]),
-                                         (123,243,233), 5 )
+                                         (123,243,233), 1 )
         for i in range(numFrames-1):
-            plt.imshow(frames_out[i])
+            plt.imshow(frames_out[i,][...,[2,1,0]])
 
         #throw out the vectors for image points that were originally not in the image
         # if for a particular frame we ended up with fewer than our maximum number of features
