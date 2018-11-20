@@ -1,5 +1,9 @@
 import cv2
 import numpy as np
+from getBoundingBox import getBoundingBox
+from getFeatures import getFeatures
+from estimateFeatureTranslation import estimateFeatureTranslation
+import matplotlib.pyplot as plt
 
 def estimateAllTranslation(startXs, startYs, img1, img2):
 
@@ -16,7 +20,7 @@ def estimateAllTranslation(startXs, startYs, img1, img2):
 	Iy = cv2.Sobel(img1_gray, cv2.CV_64F, 0, 1, ksize=sobel_kernel)
 
 	for i in range(numFeatures):
-		for j in range(numObjects):
+		for j in range(numObj):
 			startX = startXs[i][j]
 			startY = startYs[i][j]
 			newX, newY = estimateFeatureTranslation(startX, startY, Ix, Iy, img1_gray, img2_gray)
