@@ -25,15 +25,9 @@ def bgr2gray(bgr):
   return np.dot(bgr[...,:3], [0.114,0.587,0.299])
 
 
-<<<<<<< HEAD
 if __name__ == "__main__":
     #CONSTANTS
     numFrames = 10 #number of frames to calculate at a time
-=======
-#constants for corner detection
-maxFeatures = 50
-qualityLevel = .05
->>>>>>> 163c46525f64cb9d83ac1164573253f0f87e15f5
 
     #constants for corner detection
     maxFeatures = 50
@@ -61,10 +55,10 @@ def flow_runner(numFrames, maxFeatures, qualityLevel, minDistance, windowsize, h
 
 
     currentFrame = 0
-    current_frames, totalFrames, fps = loadVideo(in_video_path, currentFrame, numFrames)
+    current_frames, totalFrames, H, W, fps = loadVideo(in_video_path, currentFrame, numFrames)
     #H, W come from the video file itself
-    numFrames, H,W = current_frames.shape[0], current_frames.shape[1], current_frames.shape[2]
-    minDistance = (8/360)*H #keep same ratio of 8 pixel distance for a 360p video regardless of resolution
+    numFrames = current_frames.shape[0]
+    minDistance /=H #keep same ratio of 8 pixel distance / 360p of resolution video regardless of resolution
 
     #open output video file
     fourcc = cv2.VideoWriter_fourcc(*'mp4v')
@@ -73,16 +67,10 @@ def flow_runner(numFrames, maxFeatures, qualityLevel, minDistance, windowsize, h
     #let user draw bounding box on frame[0]
     # for now we'll just do the tracking on the whole frame
 
-    minDistance /=H #keep same ratio of 8 pixel distance / 360p of resolution video regardless of resolution
 
     while (currentFrame + numFrames - 1) < totalFrames:
-<<<<<<< HEAD
         #GET GRAYSCALE
         frames_gray = bgr2gray(current_frames)
-=======
-        #get grayscale - doing it in the get Features func instead since it was throwing errors
-        frames_gray = bgr2gray(current_frames) #?
->>>>>>> 163c46525f64cb9d83ac1164573253f0f87e15f5
 
         
         #GET DERIVATIVES
@@ -105,8 +93,9 @@ def flow_runner(numFrames, maxFeatures, qualityLevel, minDistance, windowsize, h
         
         # for now, we'll just do the whole frame
         
-        zaxis = np.rollaxis( np.rollaxis( np.outer(np.ones((1,maxFeatures,1)), np.arange(numFrames-1) )[np.newaxis, :], 2, 0), 2, 1)
-        feature_list = np.concatenate( (zaxis, feature_list), axis=2)
+        frames_coords = np.rollaxis( np.rollaxis( np.outer(np.ones((1,maxFeatures,1)), np.arange(numFrames-1) )[np.newaxis, :], 2, 0), 2, 1)
+        feature_coords = np.rollaxis( np.rollaxis( np.outer(np.ones((1,(numFrames-1),1)), np.arange(maxFeatures) )[np.newaxis, :], 2, 0), 2, 0)
+        feature_list = np.concatenate( (frames_coords, feature_coords, feature_list), axis=2)
         #now it is a (numFrames-1) x maxFeatures x 4
         #now it is w z y x coordinates (where w is frame number, z is feature number)
 
@@ -230,7 +219,6 @@ def flow_runner(numFrames, maxFeatures, qualityLevel, minDistance, windowsize, h
                                              feature_list[ ..., -2].reshape(-1,1),
                                              feature_list[ ..., -1].reshape(-1,1)]
 
-<<<<<<< HEAD
         A[ :, :, 0,1 ] = frames_Ix_Iy_summed[feature_list[ ..., 0].reshape(-1,1),
                                              feature_list[ ..., -2].reshape(-1,1),
                                              feature_list[ ..., -1].reshape(-1,1)]
@@ -242,14 +230,6 @@ def flow_runner(numFrames, maxFeatures, qualityLevel, minDistance, windowsize, h
         A[ :, :, 1,1 ] = frames_Iy_Iy_summed[feature_list[ ..., 0].reshape(-1,1),
                                              feature_list[ ..., -2].reshape(-1,1),
                                              feature_list[ ..., -1].reshape(-1,1)]
-=======
-        #run till we've reached maxIterations or till our answer is good enough
-        for i in range(maxIterations):
-            if np.min( abs(np.linalg.eigvals(A)) ) >= minAccuracy:
-                #keep calculating uv
-                
-                #calculate It (making sure to interpolate)
->>>>>>> 163c46525f64cb9d83ac1164573253f0f87e15f5
 
         # I_window_points is (numFrames-1)*maxFeatures*windowsize*windowsize, 1
         # the pixel value at each image at each window point
@@ -339,6 +319,3 @@ def flow_runner(numFrames, maxFeatures, qualityLevel, minDistance, windowsize, h
     cv2.destroyAllWindows()
 
     return 0
-
-if __name__ == '__main__':
-    flow_runner()
