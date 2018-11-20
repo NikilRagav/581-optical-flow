@@ -274,7 +274,7 @@ def flow_runner(numFrames, maxFeatures, qualityLevel, minDistance, windowsize, h
         #uv = np.round(uv).astype(int)
         #flip uv to vu so that it lines up with y,x in the old features list
         vu = np.zeros_like(feature_list, dtype=float)
-        vu[...,[-2,-1]] = uv * 10 #make the vector arrows longer so we can see
+        vu[...,[-2,-1]] = uv * 100 #make the vector arrows longer so we can see
         new_feature_list = (feature_list + vu).astype(int)
 
         #get the vectors to draw
@@ -284,7 +284,7 @@ def flow_runner(numFrames, maxFeatures, qualityLevel, minDistance, windowsize, h
             for j in range(maxFeatures):
                 cv2.line( frames_out[i], (feature_list[i,j,-1],feature_list[i,j,-2]), 
                                          (new_feature_list[i,j,-1],new_feature_list[i,j,-2]),
-                                         (123,243,233), 1 )
+                                         (123,243,233), 2 )
         for i in range(numFrames-1):
             plt.imshow(frames_out[i,][...,[2,1,0]])
 
@@ -324,7 +324,7 @@ if __name__ == "__main__":
     #constants for corner detection
     maxFeatures = 50
     qualityLevel = .05
-    minDistance = (8/360) #keep same ratio of 8 pixel distance for a 360p video regardless of resolution
+    minDistance = (18/360) #keep same ratio of 8 pixel distance for a 360p video regardless of resolution
 
     windowsize = 9
     half_window = np.floor(windowsize/2)
