@@ -305,7 +305,7 @@ def flow_runner(numFrames, maxFeatures, qualityLevel, minDistance, windowsize, h
             out.write(frame)
 
         currentFrame += numFrames
-        current_frames, __, __, __, __ = loadVideo(filename, currentFrame+numFrames, numFrames)
+        current_frames, __, __, __, __ = loadVideo(in_video_path, currentFrame+numFrames, numFrames)
         numFrames = current_frames.shape[0]
 
     #setup output video
