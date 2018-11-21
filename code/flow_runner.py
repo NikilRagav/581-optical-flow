@@ -28,7 +28,7 @@ def bgr2gray(bgr):
 def flow_runner(numFrames, maxFeatures, qualityLevel, minDistance, windowsize, half_window, maxIterations, minAccuracy):
     #filepaths for input and output
     in_folder = "input_videos/"
-    out_folder = "input_videos/"
+    out_folder = "out/"
     filename = "Easy.mp4"
 
     in_video_path = os.path.join(in_folder,filename)
@@ -40,7 +40,7 @@ def flow_runner(numFrames, maxFeatures, qualityLevel, minDistance, windowsize, h
     current_frames, totalFrames, H, W, fps = loadVideo(in_video_path, currentFrame, numFrames)
     #H, W come from the video file itself
     numFrames = current_frames.shape[0]
-    minDistance /=H #keep same ratio of 8 pixel distance / 360p of resolution video regardless of resolution
+    minDistance *=H #keep same ratio of 18 pixel distance / 360p of resolution video regardless of resolution
 
     
     #open output video file
@@ -73,7 +73,9 @@ def flow_runner(numFrames, maxFeatures, qualityLevel, minDistance, windowsize, h
 
         feature_list = np.zeros( (numFrames-1, maxFeatures, 2) )
         for i in range(numFrames-1):
-            __, __, feature_list[i] = getFeatures(frames_gray[i], [(0,0,W,H)], maxFeatures, qualityLevel, minDistance)
+            __, __, feature_list[i] = getFeatures(frames_gray[i],
+                                                  [(half_window,half_window,W-half_window*2,H-half_window*2)],
+                                                  maxFeatures, qualityLevel, minDistance)
         
         # for now, we'll just do the whole frame
         
@@ -274,7 +276,7 @@ def flow_runner(numFrames, maxFeatures, qualityLevel, minDistance, windowsize, h
         #uv = np.round(uv).astype(int)
         #flip uv to vu so that it lines up with y,x in the old features list
         vu = np.zeros_like(feature_list, dtype=float)
-        vu[...,[-2,-1]] = uv * 100 #make the vector arrows longer so we can see
+        vu[...,[-2,-1]] = uv * 10 #make the vector arrows longer so we can see
         new_feature_list = (feature_list + vu).astype(int)
 
         #get the vectors to draw
@@ -299,7 +301,7 @@ def flow_runner(numFrames, maxFeatures, qualityLevel, minDistance, windowsize, h
         #draw new box at transformed coords
 
         #append to output video
-        for frame in current_frames:
+        for frame in frames_out:
             out.write(frame)
 
         currentFrame += numFrames
@@ -319,7 +321,7 @@ def flow_runner(numFrames, maxFeatures, qualityLevel, minDistance, windowsize, h
 
 if __name__ == "__main__":
     #CONSTANTS
-    numFrames = 10 #number of frames to calculate at a time
+    numFrames = 300 #number of frames to calculate at a time
 
     #constants for corner detection
     maxFeatures = 50
@@ -327,7 +329,7 @@ if __name__ == "__main__":
     minDistance = (18/360) #keep same ratio of 8 pixel distance for a 360p video regardless of resolution
 
     windowsize = 9
-    half_window = np.floor(windowsize/2)
+    half_window = np.floor(windowsize/2).astype(int)
 
     maxIterations = 5 #stanford paper says 5 should be enough http://robots.stanford.edu/cs223b04/algo_tracking.pdf 
     minAccuracy = .01 #sandipan suggests this is enough
