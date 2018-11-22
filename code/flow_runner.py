@@ -9,9 +9,12 @@ from scipy import signal
 from scipy import sparse
 from scipy import interpolate
 from skimage import feature
+from skimage import transform
 from PIL import Image
 import os
 import imageio
+import copy
+from getBoundingBox import getBoundingBox
 
 from findDerivatives import findDerivatives
 from loadVideo import loadVideo
@@ -25,17 +28,7 @@ def bgr2gray(bgr):
   return np.dot(bgr[...,:3], [0.114,0.587,0.299])
 
 
-def flow_runner(numFrames, maxFeatures, qualityLevel, minDistance, windowsize, half_window, maxIterations, minAccuracy):
-    #filepaths for input and output
-    in_folder = "input_videos/"
-    out_folder = "out/"
-    filename = "Medium.mp4"
-
-    in_video_path = os.path.join(in_folder,filename)
-    out_video_path = os.path.join(out_folder,filename)
-
-
-
+def flow_runner(numFrames, maxFeatures, qualityLevel, minDistance, windowsize, half_window, maxIterations, minAccuracy, in_video_path, out_video_path, numObjects):
     currentFrame = 0
     current_frames, totalFrames, H, W, fps = loadVideo(in_video_path, currentFrame, numFrames)
     #H, W come from the video file itself
@@ -49,7 +42,27 @@ def flow_runner(numFrames, maxFeatures, qualityLevel, minDistance, windowsize, h
     
 
     #let user draw bounding box on frame[0]
-    # for now we'll just do the tracking on the whole frame
+    # we'll do the tracking on the whole frame and then transform the boxes at the end
+    bbox_list = []
+    bbox_pts = []
+    init_img = current_frames[0]
+    for i in range(0, numObjects):
+        bbox_list, bbox_pts, init_img = getBoundingBox(init_img, bbox_list, bbox_pts)
+
+    frames_out = np.copy(current_frames[:-1])
+    frames_out[0] = init_img
+
+    #initialize first boxes
+    curr_bbox_pts = bbox_pts
+    #get which bounding box each feature point is in
+    '''
+    if there are 2 bboxes, 
+    a 0  means the feature point is in the first bbox
+    a 1  means the feature point is in the second bbox
+    a -1 means the feature point is not in any bbox
+    '''
+    feature_list_in_bboxes = np.ones( (numFrames-1, maxFeatures), dtype=int )
+    feature_list_in_bboxes *= -1
 
 
     while (currentFrame + numFrames - 1) < totalFrames:
@@ -276,17 +289,75 @@ def flow_runner(numFrames, maxFeatures, qualityLevel, minDistance, windowsize, h
         #uv = np.round(uv).astype(int)
         #flip uv to vu so that it lines up with y,x in the old features list
         vu = np.zeros_like(feature_list, dtype=float)
-        vu[...,[-2,-1]] = uv * 10 #make the vector arrows longer so we can see
+        vu[...,[-2,-1]] = uv
+        #feature_vectors_list = (feature_list + vu*10).astype(int)  #make the vector arrows longer so we can see
         new_feature_list = (feature_list + vu).astype(int)
 
-        #get the vectors to draw
         frames_out = np.copy(current_frames[:-1])
-
+        
+        #draw vector trails (basically all tracking point vectors for all frames up to current frame)
         for i in range(numFrames-1):
             for j in range(maxFeatures):
-                cv2.line( frames_out[i], (feature_list[i,j,-1],feature_list[i,j,-2]), 
-                                         (new_feature_list[i,j,-1],new_feature_list[i,j,-2]),
-                                         (123,243,233), 2 )
+                for k in range(j):
+                    cv2.line( frames_out[i], (feature_list[i,k,-1],feature_list[i,k,-2]), 
+                                            (new_feature_list[i,k,-1],new_feature_list[i,k,-2]),
+                                            (123,243,233), 2 )
+        for i in range(numFrames-1):
+            plt.imshow(frames_out[i,][...,[2,1,0]])
+
+        #transform bounding boxes
+        for i in range(numFrames-1):
+            for j in range(numObjects):
+                curr = curr_bbox_pts[j]
+                obj_currX = []
+                obj_currY = []
+                obj_newX = []
+                obj_newY = []
+                
+                curr_Xs = feature_list[i,:,-1]
+                curr_Ys = feature_list[i,:,-2]
+                new_Xs = new_feature_list[i,:,-1]
+                new_Ys = new_feature_list[i,:,-2]
+
+                #determine which points are in this box
+                #boolean array
+                points_in_box = ( curr_Xs >= curr[0][0] and curr_Xs <= curr[1][0] and curr_Ys >= curr[0][1] and curr_Ys <= curr[3][1] )
+
+                #this is for debugging purposes
+                feature_list_in_bboxes[i, points_in_box] = j 
+
+                #x and y coords of objects within the box
+                obj_currX = feature_list[i,points_in_box,-1]
+                obj_currY = feature_list[i,points_in_box,-2]
+                obj_newX = new_feature_list[i,points_in_box,-1]
+                obj_newY = new_feature_list[i,points_in_box,-2]
+
+                #what do we do if there are no points in the box??
+
+                #get new box
+                trans = transform.SimilarityTransform()
+                start = np.ones( (feature_list[i,points_in_box,3]) )
+                start[...[0,1]] = feature_list[i,points_in_box,[-1,-2]]
+                new = np.ones( (new_feature_list[i,points_in_box,3]) )
+                new[...[0,1]] = new_feature_list[i,points_in_box,[-1,-2]]
+
+                trans.estimate(start, new)
+
+                #check this 
+                startBox = np.vstack((np.matrix.transpose(np.array(curr), np.ones(4))))
+                
+                newBox = np.dot(trans.params, startBox)
+                new_bbox_pts = np.matrix.transpose(newBox[0:2,:])
+                x0 = new_bbox_pts[0][0]
+                y0 = new_bbox_pts[0][1]
+                w = new_bbox_pts[1][0] - x0
+                h = new_bbox_pts[3][1] - y0
+                cv2.rectangle(frames_out[i], (x0, y0), (w, h), (0, 255, 0), 2)
+
+                #overwrite old with new
+                curr_bbox_pts[j] = np.matrix.transpose(newBox[0:2,:])
+
+
         for i in range(numFrames-1):
             plt.imshow(frames_out[i,][...,[2,1,0]])
 
@@ -321,17 +392,30 @@ def flow_runner(numFrames, maxFeatures, qualityLevel, minDistance, windowsize, h
 
 if __name__ == "__main__":
     #CONSTANTS
-    numFrames = 300 #number of frames to calculate at a time
+    numFrames = 10 #number of frames to calculate at a time
 
     #constants for corner detection
     maxFeatures = 50
     qualityLevel = .05
     minDistance = (18/360) #keep same ratio of 8 pixel distance for a 360p video regardless of resolution
 
+    #constants for solving for displacement vectors
     windowsize = 9
     half_window = np.floor(windowsize/2).astype(int)
 
     maxIterations = 5 #stanford paper says 5 should be enough http://robots.stanford.edu/cs223b04/algo_tracking.pdf 
     minAccuracy = .01 #sandipan suggests this is enough
 
-    flow_runner(numFrames, maxFeatures, qualityLevel, minDistance, windowsize, half_window, maxIterations, minAccuracy)
+    #filepaths for input and output
+    in_folder = "input_videos/"
+    out_folder = "out/"
+    filename = "Easy.mp4"
+    in_video_path = os.path.join(in_folder,filename)
+    out_video_path = os.path.join(out_folder,filename)
+
+    #number of objects to track with bounding boxes
+    numObjects = 2
+    
+    flow_runner(numFrames, maxFeatures, qualityLevel, minDistance, 
+                windowsize, half_window, maxIterations, minAccuracy, 
+                in_video_path, out_video_path, numObjects)
