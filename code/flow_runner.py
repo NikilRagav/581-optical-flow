@@ -65,7 +65,7 @@ def flow_runner(numFrames, maxFeatures, qualityLevel, minDistance, windowsize, h
     feature_list_in_bboxes *= -1
 
 
-    while (currentFrame + numFrames - 1) < totalFrames:
+    while (currentFrame + numFrames - 1) < numFrames:
         #GET GRAYSCALE
         frames_gray = bgr2gray(current_frames).astype(int)
 
@@ -296,14 +296,15 @@ def flow_runner(numFrames, maxFeatures, qualityLevel, minDistance, windowsize, h
         frames_out = np.copy(current_frames[:-1])
         
         #draw vector trails (basically all tracking point vectors for all frames up to current frame)
-        for i in range(numFrames-1):
-            for j in range(maxFeatures):
-                for k in range(j):
-                    cv2.line( frames_out[i], (feature_list[i,k,-1],feature_list[i,k,-2]), 
-                                            (new_feature_list[i,k,-1],new_feature_list[i,k,-2]),
-                                            (123,243,233), 2 )
-        for i in range(numFrames-1):
-            plt.imshow(frames_out[i,][...,[2,1,0]])
+        #uncomment if want to plot all features!!
+        # for i in range(numFrames-1):
+        #     for j in range(maxFeatures):
+        #         for k in range(j):
+        #             cv2.line( frames_out[i], (feature_list[i,k,-1],feature_list[i,k,-2]), 
+        #                                     (new_feature_list[i,k,-1],new_feature_list[i,k,-2]),
+        #                                     (123,243,233), 2 )
+        # for i in range(numFrames-1):
+        #     plt.imshow(frames_out[i,][...,[2,1,0]])
 
         #transform bounding boxes
         for i in range(numFrames-1):
@@ -321,7 +322,7 @@ def flow_runner(numFrames, maxFeatures, qualityLevel, minDistance, windowsize, h
 
                 #determine which points are in this box
                 #boolean array
-                points_in_box = ( curr_Xs >= curr[0][0] and curr_Xs <= curr[1][0] and curr_Ys >= curr[0][1] and curr_Ys <= curr[3][1] )
+                points_in_box = np.logical_and.reduce((curr_Xs >= curr[0][0], curr_Xs <= curr[1][0], curr_Ys >= curr[0][1], curr_Ys <= curr[3][1]))
 
                 #this is for debugging purposes
                 feature_list_in_bboxes[i, points_in_box] = j 
@@ -332,27 +333,31 @@ def flow_runner(numFrames, maxFeatures, qualityLevel, minDistance, windowsize, h
                 obj_newX = new_feature_list[i,points_in_box,-1]
                 obj_newY = new_feature_list[i,points_in_box,-2]
 
-                #what do we do if there are no points in the box??
+                #draw only points in the box
+                for k in range(len(obj_currX)):
+                    cv2.line( frames_out[i], (obj_currX[k], obj_currY[k]), (obj_newX[k], obj_newY[k]), (123,243,233), 2 )
 
                 #get new box
                 trans = transform.SimilarityTransform()
-                start = np.ones( (feature_list[i,points_in_box,3]) )
-                start[...[0,1]] = feature_list[i,points_in_box,[-1,-2]]
-                new = np.ones( (new_feature_list[i,points_in_box,3]) )
-                new[...[0,1]] = new_feature_list[i,points_in_box,[-1,-2]]
+                start = np.matrix.transpose(np.vstack((obj_currX, obj_currY)))
+                new = np.matrix.transpose(np.vstack((obj_newX, obj_newY)))
+                # start = np.ones( (feature_list[i,points_in_box,3].shape) )
+                # start[...[0,1]] = feature_list[i,points_in_box,[-1,-2]]
+                # new = np.ones( (new_feature_list[i,points_in_box,3]) )
+                # new[...[0,1]] = new_feature_list[i,points_in_box,[-1,-2]]
 
                 trans.estimate(start, new)
 
                 #check this 
-                startBox = np.vstack((np.matrix.transpose(np.array(curr), np.ones(4))))
+                startBox = np.vstack((np.matrix.transpose(np.array(curr)), np.ones(4)))
                 
                 newBox = np.dot(trans.params, startBox)
-                new_bbox_pts = np.matrix.transpose(newBox[0:2,:])
-                x0 = new_bbox_pts[0][0]
-                y0 = new_bbox_pts[0][1]
-                w = new_bbox_pts[1][0] - x0
-                h = new_bbox_pts[3][1] - y0
-                cv2.rectangle(frames_out[i], (x0, y0), (w, h), (0, 255, 0), 2)
+                new_bbox_pts = np.matrix.transpose(newBox[0:2,:]).astype(int)
+                new_x0 = new_bbox_pts[0][0]
+                new_y0 = new_bbox_pts[0][1]
+                new_x3 = new_bbox_pts[3][0]
+                new_y3 = new_bbox_pts[3][1]
+                cv2.rectangle(frames_out[i], (new_x0, new_y0), (new_x3, new_y3), (0, 255, 0), 2)
 
                 #overwrite old with new
                 curr_bbox_pts[j] = np.matrix.transpose(newBox[0:2,:])
@@ -360,6 +365,7 @@ def flow_runner(numFrames, maxFeatures, qualityLevel, minDistance, windowsize, h
 
         for i in range(numFrames-1):
             plt.imshow(frames_out[i,][...,[2,1,0]])
+            plt.show()
 
         #throw out the vectors for image points that were originally not in the image
         # if for a particular frame we ended up with fewer than our maximum number of features
@@ -392,10 +398,10 @@ def flow_runner(numFrames, maxFeatures, qualityLevel, minDistance, windowsize, h
 
 if __name__ == "__main__":
     #CONSTANTS
-    numFrames = 10 #number of frames to calculate at a time
+    numFrames = 30 #number of frames to calculate at a time
 
     #constants for corner detection
-    maxFeatures = 50
+    maxFeatures = 100
     qualityLevel = .05
     minDistance = (18/360) #keep same ratio of 8 pixel distance for a 360p video regardless of resolution
 

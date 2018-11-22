@@ -22,8 +22,6 @@ def loadVideo(filename, start, numFrames):
 
 	cnt = 0
 	while status and cnt < numFrames:
-		print(cnt)
-		print(img)
 		frame_data.append(img)
 		status, img = vid.read()
 		cnt += 1
