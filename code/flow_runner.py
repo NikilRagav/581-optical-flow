@@ -29,7 +29,7 @@ def flow_runner(numFrames, maxFeatures, qualityLevel, minDistance, windowsize, h
     #filepaths for input and output
     in_folder = "input_videos/"
     out_folder = "out/"
-    filename = "Easy.mp4"
+    filename = "Medium.mp4"
 
     in_video_path = os.path.join(in_folder,filename)
     out_video_path = os.path.join(out_folder,filename)
@@ -237,9 +237,9 @@ def flow_runner(numFrames, maxFeatures, qualityLevel, minDistance, windowsize, h
             frames_It[(feature_windows[ ..., 0]).reshape(-1,1),
                       (feature_windows[ ..., -2]).reshape(-1,1),
                       (feature_windows[ ..., -1]).reshape(-1,1)] = It
-            for i in range(numFrames-1):
-                frames_Ix_It_summed[i] = signal.convolve2d(frames_Ix[i]*frames_It[i], summation_kernel, mode='same', boundary='symm')
-                frames_Iy_It_summed[i] = signal.convolve2d(frames_Iy[i]*frames_It[i], summation_kernel, mode='same', boundary='symm')
+            for j in range(numFrames-1):
+                frames_Ix_It_summed[j] = signal.convolve2d(frames_Ix[j]*frames_It[j], summation_kernel, mode='same', boundary='symm')
+                frames_Iy_It_summed[j] = signal.convolve2d(frames_Iy[j]*frames_It[j], summation_kernel, mode='same', boundary='symm')
 
             b[ :, :, 0,0 ] = frames_Ix_It_summed[feature_list[ ..., 0],
                                                  feature_list[ ..., -2],
